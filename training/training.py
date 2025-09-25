@@ -8,7 +8,6 @@ from tqdm import tqdm
 import wandb
 from models.UNET import ConditionalUNet
 from models.CLIP import CLIPTextEncoder
-from models.DDPM import DDPM
 from models.VAE import VAE
 from config import ModelConfig, TrainConfig
 

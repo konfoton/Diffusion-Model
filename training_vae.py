@@ -10,7 +10,7 @@ checkpoint_vae = None
 
 def main():
     os.makedirs("checkpoints", exist_ok=True)
-    dl = get_coco_train_dataloader(batch_size=TrainConfig.batch_size, image_size=TrainConfig.image_size)
+    dl = get_coco_train_dataloader(batch_size=TrainConfig.vae_batch_size, image_size=TrainConfig.image_size)
     device = get_device()
     vae = VAE(
             in_channels=3,
