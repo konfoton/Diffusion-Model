@@ -1,6 +1,8 @@
 import math
 import torch
 import torch.nn as nn
+from config import ModelConfig
+
 
 def cosine_beta_schedule(T, s=0.008):
     steps = T + 1
@@ -11,7 +13,7 @@ def cosine_beta_schedule(T, s=0.008):
     return betas.clamp(0.0001, 0.9999)
 
 class DDPM(nn.Module):
-    def __init__(self, model, timesteps=1000, beta_schedule="cosine", device="cpu"):
+    def __init__(self, model, timesteps=ModelConfig.timesteps, beta_schedule=ModelConfig.beta_schedule, device=ModelConfig.device):
         super().__init__()
         self.model = model
         self.T = timesteps
@@ -65,7 +67,7 @@ class DDPM(nn.Module):
         return mean + torch.sqrt(var) * noise
 
     @torch.no_grad()
-    def sample(self, shape, text_context, device, guidance_scale=5.0, text_encoder=None):
+    def sample(self, shape, text_context, device, guidance_scale=ModelConfig.guidance_scale, text_encoder=None):
         B = shape[0]
         x = torch.randn(shape, device=device)
         un_ctx = text_encoder.unconditional(B, device=device) if (guidance_scale is not None and text_encoder is not None) else None

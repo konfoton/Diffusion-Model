@@ -3,7 +3,7 @@ import torch
 from torchvision.utils import save_image
 from models.unet import ConditionalUNet
 from models.text_encoder import CLIPTextEncoder
-from diffusion.ddpm import DDPM
+from models.ddpm import DDPM
 
 def get_device():
     if torch.backends.mps.is_available():

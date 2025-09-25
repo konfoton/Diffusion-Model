@@ -1,0 +1,53 @@
+from training import train_diffusion_only
+from training import get_device
+from models.DDPM import DDPM
+from models.VAE import VAE
+from models.CLIP import CLIPTextEncoder
+from models.UNET import ConditionalUNet
+from config import ModelConfig, TrainConfig
+import torch
+import os
+
+
+
+checkpoint_vae = None
+
+checkpoint_unet = None
+
+
+def main():
+    os.makedirs("checkpoints", exist_ok=True)
+    device = get_device()
+    vae = VAE(
+            in_channels=ModelConfig.img_channels,
+            latent_dim=ModelConfig.vae_latent_dim,
+            base_channels=ModelConfig.vae_base_channels,
+            kl_weight=ModelConfig.vae_kl_weight
+        ).to(device)
+    if checkpoint_vae:
+        vae.load_state_dict(torch.load(checkpoint_vae, map_location=device))
+        print(f"Loaded VAE checkpoint from {checkpoint_vae}")
+
+    vae.eval()
+
+    text_enc = CLIPTextEncoder().to(device)
+    text_enc.text_model.eval()
+    for p in text_enc.parameters(): 
+        p.requires_grad = False
+
+
+    model = ConditionalUNet(
+        img_channels=ModelConfig.vae_latent_dim,
+        base_ch=ModelConfig.unet_base_channels,
+        ch_mults=ModelConfig.chan_mults,
+        ctx_dim=ModelConfig.embed_dim
+    ).to(device)
+
+    if checkpoint_unet:
+        model.load_state_dict(torch.load(checkpoint_unet, map_location=device)["model"])
+        print(f"Loaded UNet checkpoint from {checkpoint_unet}")
+
+    ddpm = DDPM(model, timesteps=ModelConfig.timesteps, device=device)
+
+
+    train_diffusion_only(model, vae, ddpm, text_enc, dl, device, epochs=ModelConfig.diffusion_epochs, lr=ModelConfig.diffusion_lr)
