@@ -7,7 +7,7 @@ from models.UNET import ConditionalUNet
 from config import ModelConfig, TrainConfig
 import torch
 import os
-
+from data.coco_dataloader import get_coco_train_dataloader
 
 
 checkpoint_vae = None
@@ -18,6 +18,7 @@ checkpoint_unet = None
 def main():
     os.makedirs("checkpoints", exist_ok=True)
     device = get_device()
+    dl = get_coco_train_dataloader(batch_size=TrainConfig.batch_size, image_size=TrainConfig.image_size)
     vae = VAE(
             in_channels=ModelConfig.img_channels,
             latent_dim=ModelConfig.vae_latent_dim,
@@ -50,4 +51,4 @@ def main():
     ddpm = DDPM(model, timesteps=ModelConfig.timesteps, device=device)
 
 
-    train_diffusion_only(model, vae, ddpm, text_enc, dl, device, epochs=ModelConfig.diffusion_epochs, lr=ModelConfig.diffusion_lr)
+    train_diffusion_only(model, vae, ddpm, text_enc, dl, device, epochs=TrainConfig.diffusion_epochs, lr=TrainConfig.diffusion_lr)

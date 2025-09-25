@@ -4,12 +4,13 @@ from models.VAE import VAE
 from config import ModelConfig, TrainConfig
 import torch
 import os
-
+from data.coco_dataloader import get_coco_train_dataloader
 
 checkpoint_vae = None
 
 def main():
     os.makedirs("checkpoints", exist_ok=True)
+    dl = get_coco_train_dataloader(batch_size=TrainConfig.batch_size, image_size=TrainConfig.image_size)
     device = get_device()
     vae = VAE(
             in_channels=3,
@@ -22,4 +23,4 @@ def main():
         vae.load_state_dict(torch.load(checkpoint_vae, map_location=device)["model"])
         print(f"Loaded VAE checkpoint from {checkpoint_vae}")
 
-    train_vae_only(vae, dl=None, device=device, epochs=TrainConfig.vae_epochs)
+    train_vae_only(vae, dl=dl, device=device, epochs=TrainConfig.vae_epochs)

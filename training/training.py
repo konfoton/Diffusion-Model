@@ -12,31 +12,6 @@ from models.DDPM import DDPM
 from models.VAE import VAE
 from config import ModelConfig, TrainConfig
 
-class ImageTextFolder(Dataset):
-    def __init__(self, root, captions_file, image_size=64, cfg_dropout=0.1):
-        self.root = root
-        self.items = []
-        with open(captions_file, "r") as f:
-            for line in f:
-                p, c = line.rstrip("\n").split("\t", 1)
-                self.items.append((p, c))
-        self.tfm = transforms.Compose([
-            transforms.Resize(image_size, interpolation=transforms.InterpolationMode.BICUBIC),
-            transforms.CenterCrop(image_size),
-            transforms.ToTensor(),
-            transforms.Normalize([0.5]*3, [0.5]*3),
-        ])
-        self.cfg_dropout = cfg_dropout
-
-    def __len__(self): return len(self.items)
-
-    def __getitem__(self, idx):
-        p, caption = self.items[idx]
-        img = Image.open(os.path.join(self.root, p)).convert("RGB")
-        x = self.tfm(img)
-        if random.random() < self.cfg_dropout:
-            caption = ""
-        return x, caption
 
 def get_device():
     if torch.backends.mps.is_available():
@@ -46,7 +21,6 @@ def get_device():
     return torch.device("cpu")
 
 def train_vae_only(vae, dataloader, device, epochs=50, lr=1e-4):
-    """Train VAE separately before diffusion training"""
     print("Training VAE...")
     vae_optimizer = torch.optim.AdamW(vae.parameters(), lr=lr)
     vae.train()
@@ -89,8 +63,7 @@ def train_vae_only(vae, dataloader, device, epochs=50, lr=1e-4):
               f"KL={total_kl_loss/len(dataloader):.4f}")
 
 def train_diffusion_only(model, vae, ddpm, text_enc, dataloader, device, epochs=100, lr=1e-5):
-    """Train diffusion model only with frozen VAE (Sequential Training Phase 2)"""
-    print("Phase 2: Training Diffusion Model (VAE frozen)...")
+    print("Training Diffusion Model (VAE frozen)...")
     
     diffusion_optimizer = torch.optim.AdamW(model.parameters(), lr=lr)
     scaler = torch.cuda.amp.GradScaler(enabled=(device.type in ["cuda"]))

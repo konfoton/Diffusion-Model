@@ -22,6 +22,8 @@ class ModelConfig:
 class TrainConfig:
     image_size: int = 64
     batch_size: int = 16
-    lr: float = 1e-5  
-    timesteps: int = 1000  
-    epochs: int = 1000  
+    vae_lr: float = 1e-4
+    uner_lr: float = 1e-4
+    timesteps: int = 500  
+    vae_epochs: int = 10
+    unet_epoch: int = 10
