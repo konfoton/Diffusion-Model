@@ -6,7 +6,7 @@ class ModelConfig:
     model_name: str = "openai/clip-vit-base-patch32"
     embed_dim: int = 512
     guidance_scale: float = 5.0
-    base_ch: int = 32  
+    unet_base_channels: int = 32
     chan_mults: tuple = (1, 2, 4, 8)
     img_channels: int = 3
     beta_schedule: str = "cosine"
@@ -23,7 +23,7 @@ class TrainConfig:
     image_size: int = 64
     batch_size: int = 16
     vae_lr: float = 1e-4
-    uner_lr: float = 1e-4
+    unet_lr: float = 1e-4
     timesteps: int = 500  
     vae_epochs: int = 10
-    unet_epoch: int = 10
+    unet_epochs: int = 10

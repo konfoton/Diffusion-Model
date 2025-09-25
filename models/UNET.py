@@ -97,7 +97,7 @@ class UpBlock(nn.Module):
         return x
 
 class ConditionalUNet(nn.Module):
-    def __init__(self, img_channels=3, base_ch=ModelConfig.base_ch, ch_mults=ModelConfig.chan_mults, ctx_dim=ModelConfig.embed_dim, out_channels=None):
+    def __init__(self, img_channels=3, base_ch=ModelConfig.unet_base_channels, ch_mults=ModelConfig.chan_mults, ctx_dim=ModelConfig.embed_dim, out_channels=None):
         super().__init__()
         self.img_channels = img_channels
         self.ctx_dim = ctx_dim

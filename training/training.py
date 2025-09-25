@@ -5,7 +5,7 @@ from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms
 from PIL import Image
 from tqdm import tqdm
-
+import wandb
 from models.UNET import ConditionalUNet
 from models.CLIP import CLIPTextEncoder
 from models.DDPM import DDPM
@@ -24,12 +24,18 @@ def train_vae_only(vae, dataloader, device, epochs=50, lr=1e-4):
     print("Training VAE...")
     vae_optimizer = torch.optim.AdamW(vae.parameters(), lr=lr)
     vae.train()
-    
+
+    wandb.init(project="vae-training")
+
     for epoch in range(epochs):
         total_loss = 0
         total_recon_loss = 0
         total_kl_loss = 0
-        
+        total_loss_last_100 = 0
+        total_recon_loss_last_100 = 0
+        total_kl_loss_last_100 = 0
+        counter = 0
+
         pbar = tqdm(dataloader, desc=f"VAE Epoch {epoch+1}/{epochs}")
         for imgs, _ in pbar:
             imgs = imgs.to(device)
@@ -44,13 +50,28 @@ def train_vae_only(vae, dataloader, device, epochs=50, lr=1e-4):
             total_loss += loss.item()
             total_recon_loss += recon_loss.item()
             total_kl_loss += kl_loss.item()
-            
+
+            total_loss_last_100 += loss.item()
+            total_recon_loss_last_100 += recon_loss.item()
+            total_kl_loss_last_100 += kl_loss.item()
+
             pbar.set_postfix({
                 'loss': f'{loss.item():.4f}',
                 'recon': f'{recon_loss.item():.4f}',
                 'kl': f'{kl_loss.item():.4f}'
             })
-        
+            counter += 1
+            if counter % 100 == 0:
+                wandb.log({
+                    "step": counter // 100,
+                    "loss": total_loss_last_100 / 100,
+                    "recon": total_recon_loss_last_100 / 100,
+                    "kl": total_kl_loss_last_100 / 100
+                })
+                total_loss_last_100 = 0
+                total_recon_loss_last_100 = 0
+                total_kl_loss_last_100 = 0
+
         os.makedirs("checkpoints", exist_ok=True)
         torch.save({
             "model": vae.state_dict(),
@@ -64,14 +85,16 @@ def train_vae_only(vae, dataloader, device, epochs=50, lr=1e-4):
 
 def train_diffusion_only(model, vae, ddpm, text_enc, dataloader, device, epochs=100, lr=1e-5):
     print("Training Diffusion Model (VAE frozen)...")
-    
+    wandb.init(project="diffusion-training")
     diffusion_optimizer = torch.optim.AdamW(model.parameters(), lr=lr)
-    scaler = torch.cuda.amp.GradScaler(enabled=(device.type in ["cuda"]))
+    scaler = torch.amp.GradScaler(enabled=(device.type in ["cuda"]))
     
     model.train()
     vae.eval()
     for epoch in range(epochs):
         total_loss = 0
+        loss_last_100 = 0
+        counter = 0
         pbar = tqdm(dataloader, desc=f"Diffusion Epoch {epoch+1}/{epochs}")
         
         for imgs, captions in pbar:
@@ -96,6 +119,14 @@ def train_diffusion_only(model, vae, ddpm, text_enc, dataloader, device, epochs=
             
             total_loss += loss.item()
             pbar.set_postfix({'loss': f'{loss.item():.4f}'})
+            loss_last_100 += loss.item()
+            counter += 1
+            if counter % 100 == 0:
+                wandb.log({
+                    "step": counter // 100,
+                    "loss": loss_last_100 / 100
+                })
+                loss_last_100 = 0
         
         os.makedirs("checkpoints", exist_ok=True)
         torch.save({

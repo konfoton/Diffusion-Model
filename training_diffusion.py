@@ -1,6 +1,6 @@
-from training import train_diffusion_only
-from training import get_device
-from models.DDPM import DDPM
+from training.training import train_diffusion_only
+from training.training import get_device
+from models.LatentDDPM import LatentDDPM
 from models.VAE import VAE
 from models.CLIP import CLIPTextEncoder
 from models.UNET import ConditionalUNet
@@ -48,7 +48,10 @@ def main():
         model.load_state_dict(torch.load(checkpoint_unet, map_location=device)["model"])
         print(f"Loaded UNet checkpoint from {checkpoint_unet}")
 
-    ddpm = DDPM(model, timesteps=ModelConfig.timesteps, device=device)
+    ddpm = LatentDDPM(model, timesteps=ModelConfig.timesteps, device=device)
 
 
-    train_diffusion_only(model, vae, ddpm, text_enc, dl, device, epochs=TrainConfig.diffusion_epochs, lr=TrainConfig.diffusion_lr)
+    train_diffusion_only(model, vae, ddpm, text_enc, dl, device, epochs=TrainConfig.unet_epochs, lr=TrainConfig.unet_lr)
+
+if __name__ == "__main__":
+    main()

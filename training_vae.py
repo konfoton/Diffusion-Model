@@ -1,5 +1,5 @@
-from training import train_vae_only
-from training import get_device
+from training.training import train_vae_only
+from training.training import get_device
 from models.VAE import VAE
 from config import ModelConfig, TrainConfig
 import torch
@@ -23,4 +23,7 @@ def main():
         vae.load_state_dict(torch.load(checkpoint_vae, map_location=device)["model"])
         print(f"Loaded VAE checkpoint from {checkpoint_vae}")
 
-    train_vae_only(vae, dl=dl, device=device, epochs=TrainConfig.vae_epochs)
+    train_vae_only(vae, dataloader=dl, device=device, epochs=TrainConfig.vae_epochs)
+
+if __name__ == "__main__":
+    main()
