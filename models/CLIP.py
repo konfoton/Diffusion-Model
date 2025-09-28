@@ -8,12 +8,16 @@ class CLIPTextEncoder(torch.nn.Module):
         self.text_model = CLIPTextModel.from_pretrained(model_name)
 
     @torch.no_grad()
-    def encode(self, texts, device, max_length=77):
+    def encode(self, texts, device, max_length=77, return_mask: bool = False):
         toks = self.tokenizer(
             texts, padding="max_length", truncation=True, max_length=max_length, return_tensors="pt"
         )
         toks = {k: v.to(device) for k, v in toks.items()}
         out = self.text_model(**toks)
+        if return_mask:
+            # key_padding_mask expects True at PAD positions
+            key_padding_mask = (toks["attention_mask"] == 0)
+            return out.last_hidden_state, key_padding_mask  # (B, L, C), (B, L)
         return out.last_hidden_state  # (B, L, C)
 
     @torch.no_grad()

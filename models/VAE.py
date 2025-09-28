@@ -242,3 +242,15 @@ class VAE(nn.Module):
     def get_latent_size(self, input_size):
         """Calculate latent space size given input image size"""
         return input_size // 8
+    def get_latent_std(self, data_loader):
+        """Estimate standard deviation of latent representations over a dataset"""
+        self.eval()
+        latents = []
+        with torch.no_grad():
+            for imgs, _ in data_loader:
+                imgs = imgs.to(next(self.parameters()).device)
+                mean, logvar = self.encode(imgs)
+                z = self.reparameterize(mean, logvar)
+                latents.append(z.cpu())
+        latents = torch.cat(latents, dim=0)
+        return torch.std(latents)

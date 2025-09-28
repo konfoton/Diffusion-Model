@@ -10,8 +10,8 @@ checkpoint_vae = None
 
 def main():
     os.makedirs("checkpoints", exist_ok=True)
-    dl = get_coco_train_dataloader(batch_size=TrainConfig.vae_batch_size, image_size=TrainConfig.image_size)
     device = get_device()
+    dl = get_coco_train_dataloader(batch_size=TrainConfig.vae_batch_size, image_size=ModelConfig.image_size)
     vae = VAE(
             in_channels=3,
             latent_dim=ModelConfig.vae_latent_dim,
@@ -22,8 +22,11 @@ def main():
     if checkpoint_vae:
         vae.load_state_dict(torch.load(checkpoint_vae, map_location=device)["model"])
         print(f"Loaded VAE checkpoint from {checkpoint_vae}")
+    vae.kl_weight = 0.6
+    vae.train()
 
-    train_vae_only(vae, dataloader=dl, device=device, epochs=TrainConfig.vae_epochs)
+    train_vae_only(vae, dataloader=dl, device=device, epochs=TrainConfig.vae_epochs, lr=TrainConfig.vae_lr)
+
 
 if __name__ == "__main__":
     main()

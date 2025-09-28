@@ -4,7 +4,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from config import ModelConfig
 
-def timestep_embedding(timesteps, dim, max_period=ModelConfig.timesteps):
+def timestep_embedding(timesteps, dim, max_period=10000):
     half = dim // 2
     exps = torch.arange(half, device=timesteps.device, dtype=torch.float32) / half
     freqs = torch.exp(-math.log(max_period) * exps)
@@ -49,13 +49,13 @@ class CrossAttention2D(nn.Module):
         self.proj = nn.Linear(channels, channels)
         self.norm = nn.GroupNorm(ModelConfig.group_size, channels)
 
-    def forward(self, x, context):
+    def forward(self, x, context, key_padding_mask=None):
         B, C, H, W = x.shape
         h = x.permute(0, 2, 3, 1).reshape(B, H * W, C)
         q = self.to_q(h)
         k = self.to_k(context)
         v = self.to_v(context)
-        out, _ = self.attn(q, k, v, need_weights=False)
+        out, _ = self.attn(q, k, v, need_weights=False, key_padding_mask=key_padding_mask)
         out = self.proj(out)
         out = out.reshape(B, H, W, C).permute(0, 3, 1, 2)
         return self.norm(x + out)
@@ -68,11 +68,11 @@ class DownBlock(nn.Module):
         self.attn = CrossAttention2D(out_ch, n_heads=4, context_dim=ctx_dim) if use_attn else None
         self.down = nn.Conv2d(out_ch, out_ch, 3, stride=2, padding=1)
 
-    def forward(self, x, t_emb, context=None):
+    def forward(self, x, t_emb, context=None, key_padding_mask=None):
         x = self.res1(x, t_emb)
         x = self.res2(x, t_emb)
         if self.attn is not None and context is not None:
-            x = self.attn(x, context)
+            x = self.attn(x, context, key_padding_mask=key_padding_mask)
         skip = x
         x = self.down(x)
         return x, skip
@@ -85,7 +85,7 @@ class UpBlock(nn.Module):
         self.res2 = ResBlock(out_ch, out_ch, t_emb_dim)
         self.attn = CrossAttention2D(out_ch, n_heads=4, context_dim=ctx_dim) if use_attn else None
 
-    def forward(self, x, skip, t_emb, context=None):
+    def forward(self, x, skip, t_emb, context=None, key_padding_mask=None):
         x = self.up(x)
         if x.shape[-1] != skip.shape[-1] or x.shape[-2] != skip.shape[-2]:
             x = F.interpolate(x, size=skip.shape[-2:], mode="nearest")
@@ -93,7 +93,7 @@ class UpBlock(nn.Module):
         x = self.res1(x, t_emb)
         x = self.res2(x, t_emb)
         if self.attn is not None and context is not None:
-            x = self.attn(x, context)
+            x = self.attn(x, context, key_padding_mask=key_padding_mask)
         return x
 
 class ConditionalUNet(nn.Module):
@@ -133,7 +133,7 @@ class ConditionalUNet(nn.Module):
         self.out_norm = nn.GroupNorm(ModelConfig.group_size, in_ch)
         self.out_conv = nn.Conv2d(in_ch, out_channels, 3, padding=1)
 
-    def forward(self, x, t, context):
+    def forward(self, x, t, context, key_padding_mask=None):
         t_emb = timestep_embedding(t, self.t_emb_dim)
         t_emb = self.t_mlp(t_emb)
 
@@ -141,16 +141,16 @@ class ConditionalUNet(nn.Module):
 
         skips = []
         for down in self.downs:
-            x, s = down(x, t_emb, context)
+            x, s = down(x, t_emb, context, key_padding_mask=key_padding_mask)
             skips.append(s)
 
         x = self.mid_res1(x, t_emb)
-        x = self.mid_attn(x, context)
+        x = self.mid_attn(x, context, key_padding_mask=key_padding_mask)
         x = self.mid_res2(x, t_emb)
 
         for up in self.ups:
             s = skips.pop()
-            x = up(x, s, t_emb, context)
+            x = up(x, s, t_emb, context, key_padding_mask=key_padding_mask)
 
         x = self.out_conv(F.silu(self.out_norm(x)))
         return x 

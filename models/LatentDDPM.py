@@ -61,12 +61,12 @@ class LatentDDPM(nn.Module):
         sqrt_om = self.sqrt_one_minus_alphas_cumprod[t].view(-1, 1, 1, 1)
         return sqrt_ac * x0 + sqrt_om * noise, noise
 
-    def p_mean_variance(self, x_t, t, context, guidance_scale=None, uncond_context=None):
+    def p_mean_variance(self, x_t, t, context, guidance_scale=None, uncond_context=None, key_padding_mask=None):
         if guidance_scale is None or uncond_context is None:
-            eps = self.model(x_t, t, context)
+            eps = self.model(x_t, t, context, key_padding_mask=key_padding_mask)
         else:
-            eps_cond = self.model(x_t, t, context)
-            eps_un = self.model(x_t, t, uncond_context)
+            eps_cond = self.model(x_t, t, context, key_padding_mask=key_padding_mask)
+            eps_un = self.model(x_t, t, uncond_context, key_padding_mask=key_padding_mask)
             eps = eps_un + guidance_scale * (eps_cond - eps_un)
 
         beta_t = self.betas[t].view(-1, 1, 1, 1)
@@ -78,8 +78,8 @@ class LatentDDPM(nn.Module):
         var = self.posterior_variance[t].view(-1, 1, 1, 1)
         return mean, var.clamp(min=1e-20), x0_pred, eps
 
-    def p_sample(self, x_t, t, context, guidance_scale=None, uncond_context=None):
-        mean, var, _, _ = self.p_mean_variance(x_t, t, context, guidance_scale, uncond_context)
+    def p_sample(self, x_t, t, context, guidance_scale=None, uncond_context=None, key_padding_mask=None):
+        mean, var, _, _ = self.p_mean_variance(x_t, t, context, guidance_scale, uncond_context, key_padding_mask)
         if (t > 0).any():
             noise = torch.randn_like(x_t)
         else:
@@ -87,7 +87,7 @@ class LatentDDPM(nn.Module):
         return mean + torch.sqrt(var) * noise
 
     @torch.no_grad()
-    def sample(self, shape, text_context, device, guidance_scale=ModelConfig.guidance_scale, text_encoder=None, return_latents=False):
+    def sample(self, shape, text_context, device, guidance_scale=ModelConfig.guidance_scale, text_encoder=None, return_latents=False, key_padding_mask=None):
         """Sample images, optionally returning intermediate latents"""
         B = shape[0]
         
@@ -106,7 +106,7 @@ class LatentDDPM(nn.Module):
         # Denoising loop
         for i in reversed(range(self.T)):
             t = torch.full((B,), i, device=device, dtype=torch.long)
-            x = self.p_sample(x, t, text_context, guidance_scale, un_ctx)
+            x = self.p_sample(x, t, text_context, guidance_scale, un_ctx, key_padding_mask)
         
         if return_latents:
             return x
@@ -118,7 +118,7 @@ class LatentDDPM(nn.Module):
         return x
 
     @torch.no_grad()
-    def sample_progressive(self, shape, text_context, device, guidance_scale=ModelConfig.guidance_scale, text_encoder=None, save_every=100):
+    def sample_progressive(self, shape, text_context, device, guidance_scale=ModelConfig.guidance_scale, text_encoder=None, save_every=100, key_padding_mask=None):
         """Sample with progressive outputs for visualization"""
         B = shape[0]
         
@@ -135,7 +135,7 @@ class LatentDDPM(nn.Module):
         intermediates = []
         for i in reversed(range(self.T)):
             t = torch.full((B,), i, device=device, dtype=torch.long)
-            x = self.p_sample(x, t, text_context, guidance_scale, un_ctx)
+            x = self.p_sample(x, t, text_context, guidance_scale, un_ctx, key_padding_mask)
             
             # Save intermediate results
             if i % save_every == 0 or i == 0:
@@ -147,10 +147,28 @@ class LatentDDPM(nn.Module):
         
         return x, intermediates
 
-    def loss(self, x0, t, context):
+    def loss(self, x0, t, context, key_padding_mask=None):
         """Compute diffusion loss (works in latent or pixel space)"""
         x_t, noise = self.q_sample(x0, t)
-        eps_pred = self.model(x_t, t, context)
-        return torch.nn.functional.mse_loss(eps_pred, noise)
+        eps_pred = self.model(x_t, t, context, key_padding_mask=key_padding_mask)
+        return torch.nn.functional.mse_loss(eps_pred, noise, reduction="mean")
+    
+    def cfg_loss(self, x0, t, context, uncond_context, cfg_weight=1.0, key_padding_mask=None):
+        """
+        Compute CFG training loss by training on both conditional and unconditional predictions
+        """
+        x_t, noise = self.q_sample(x0, t)
+        
+        # Conditional prediction
+        eps_cond = self.model(x_t, t, context, key_padding_mask=key_padding_mask)
+        loss_cond = torch.nn.functional.mse_loss(eps_cond, noise, reduction="mean")
+        
+        # Unconditional prediction  
+        eps_uncond = self.model(x_t, t, uncond_context, key_padding_mask=None)
+        loss_uncond = torch.nn.functional.mse_loss(eps_uncond, noise, reduction="mean")
+        
+        # Weighted combination
+        total_loss = loss_cond + cfg_weight * loss_uncond
+        return total_loss
 
 
