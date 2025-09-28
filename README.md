@@ -2,7 +2,7 @@
 
 A PyTorch implementation of a text-to-image diffusion model that operates in latent space using a Variational Autoencoder (VAE), with support for Classifier-Free Guidance (CFG) training and inference.
 
-## 🌟 Features
+## Features
 
 - **Latent Space Diffusion**: Efficient generation in compressed VAE latent space
 - **Text Conditioning**: CLIP-based text encoding for text-to-image generation
@@ -12,7 +12,7 @@ A PyTorch implementation of a text-to-image diffusion model that operates in lat
 - **Progressive Sampling**: Visualization of denoising process
 - **Mixed Precision Training**: Optimized training with automatic mixed precision
 
-## 🏗️ Architecture
+## Architecture
 
 ### Core Components
 
@@ -39,7 +39,7 @@ A PyTorch implementation of a text-to-image diffusion model that operates in lat
    - Progressive sampling with intermediate visualization
 
 
-## 📊 Training Pipeline
+## Training Pipeline
 
 1. **VAE Training**
   - Reconstruction loss + KL divergence
@@ -55,3 +55,39 @@ A PyTorch implementation of a text-to-image diffusion model that operates in lat
   - Classifier-free guidance for improved quality
   - Progressive denoising visualization
   - Flexible text conditioning
+
+## Loss visualization
+
+<img src="./images/recon.png" alt="Demo Screenshot" width="300"/>
+
+<img src="./images/kl.png" alt="Demo Screenshot" width="300"/>
+
+<img src="./images/DDPM.png" alt="Demo Screenshot" width="300"/>
+
+## Visual Result
+
+### VAE
+
+#### Original vs Reconstruction
+**Original Image**  
+<img src="./images/original.png" alt="Original Image" width="300"/>
+
+**Reconstruction**  
+<img src="./images/reconn.png" alt="VAE Reconstruction" width="300"/>
+
+#### Latent Space Sampling
+**Generated from VAE Latent Space**  
+<img src="./images/latent.png" alt="Latent Space Sample" width="300"/>
+
+### Diffusion Model (DDPM)
+
+#### Current Results & Analysis
+Unfortunately, DDPM sampling currently captures only colors and basic shapes and is not yet optimal. This is likely due to:
+- Limited training updates on a relatively large dataset (120k images)
+- Training constraints on RTX 3090
+- Need for longer training as loss continues to decrease
+- Potential improvement with perceptual loss addition
+
+#### Generated Sample
+**Prompt:** "A man eating a pizza"  
+<img src="./images/samplerr.png" alt="DDPM Generated Sample" width="300"/>
